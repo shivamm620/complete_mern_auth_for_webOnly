@@ -29,6 +29,8 @@ function App() {
         const { data } = await Api.get("/auto");
 
         if (data?.data?.user) {
+          console.log(data?.data?.user);
+
           dispatch(setUser(data.data.user));
         }
       } catch (error) {

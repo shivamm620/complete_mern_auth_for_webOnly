@@ -178,7 +178,6 @@ export const autoLogin = asyncHandler(async (req, res) => {
   const accessToken = req.cookies?.accesstoken;
   const refreshToken = req.cookies?.refreshtoken;
 
-  //  Check Access Token
   if (accessToken) {
     try {
       const decoded = jwt.verify(
@@ -187,7 +186,11 @@ export const autoLogin = asyncHandler(async (req, res) => {
       );
       const user = await UserModel.findById(decoded.id);
 
-      if (!user) throw new ApiError(401, "User not found");
+      if (!user) {
+        return res
+          .status(401)
+          .json(new ApiResponse(401, null, "User not found"));
+      }
 
       return res.status(200).json(
         new ApiResponse(
@@ -206,11 +209,10 @@ export const autoLogin = asyncHandler(async (req, res) => {
         )
       );
     } catch (err) {
-      // access token expired  continue to check refresh
+      return res.status(401).json(new ApiResponse(401, null, "Unauthorized"));
     }
   }
 
-  //  Check Refresh Token
   if (refreshToken) {
     try {
       const decoded = jwt.verify(
@@ -219,22 +221,18 @@ export const autoLogin = asyncHandler(async (req, res) => {
       );
       const user = await UserModel.findById(decoded.id);
 
-      if (!user) throw new ApiError(401, "User not found");
+      if (!user)
+        return res.status(401).json(new ApiResponse(401, null, "Unauthorized"));
       if (!user.refreshToken.includes(refreshToken)) {
         return res.status(401).json(new ApiResponse(401, null, "Unauthorized"));
       }
 
-      // remove old RT
       user.refreshToken = user.refreshToken.filter((t) => t !== refreshToken);
-
-      // generate new tokens
       const newAccessToken = await user.genaccessToken();
       const newRefreshToken = await user.genrefreshToken();
 
       user.refreshToken.push(newRefreshToken);
       await user.save({ validateBeforeSave: false });
-
-      // set cookies
       res.cookie("accesstoken", newAccessToken, {
         httpOnly: true,
         secure: true,
@@ -267,7 +265,7 @@ export const autoLogin = asyncHandler(async (req, res) => {
         )
       );
     } catch (err) {
-      // refresh token invalid
+      return res.status(401).json(new ApiResponse(401, null, "Unauthorized"));
     }
   }
   return res.status(401).json(new ApiResponse(401, null, "Unauthorized"));
@@ -293,8 +291,6 @@ export const resendEmail = asyncHandler(async (req, res) => {
     process.env.EMAIL_VERIFY_SECRET,
     { expiresIn: "1d" }
   );
-
-  // Email HTML
   const mailOption = {
     from: process.env.GMAIL_MAIL,
     to: user.email,
